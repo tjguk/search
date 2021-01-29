@@ -4,34 +4,33 @@ import glob
 import itertools
 import re
 
+def term_as_regex(term):
+    term = term.replace("*", r"[\w\.]*")
+    term = term.replace("?", r"[\w\.]")
+    return term
+
 def find_matches(filepath, terms):
     with open(filepath, encoding="utf-8") as f:
         text = f.read()
 
-    finds = {}
-    for i in re.finditer("|".join(terms), text):
-        match = i.group()
-        matched_from, _ = i.span()
-        finds.setdefault(match, set()).add(matched_from)
+    finder = re.compile("|".join(terms), flags=re.IGNORECASE)
+    found = set(finder.findall(text))
+    found_terms = set(t for t in terms if any(re.match(t, f, flags=re.IGNORECASE) for f in found))
+    score = len(found_terms & terms)
 
-    if finds:
-        combos = list(itertools.product(finds.items()))
-        for c in combos:
-            print(c)
-        proximities = [sum(abs(a - b) for (a, b) in itertools.product(p)) for p in combos]
-        closest_match = min(proximities)
-        return closest_match
-    else:
-        return None
+    return score
 
 def main(filepattern, *search_for):
+    search_terms = set(term_as_regex(t) for t in search_for)
+    print(search_terms)
+
     file_scores = {}
     for filepath in glob.glob(filepattern):
-        score = find_matches(filepath, search_for)
-        if score is not None:
+        score = find_matches(filepath, search_terms)
+        if score:
             file_scores[filepath] = score
 
-    for filepath, score in sorted(file_scores.items(), key=lambda x: x[-1]):
+    for filepath, score in sorted(file_scores.items(), key=lambda x: x[-1], reverse=True):
         print(filepath, "=>", score)
 
 if __name__ == '__main__':
